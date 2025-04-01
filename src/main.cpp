@@ -13,14 +13,10 @@ class Lost-Found{
 	public:
 
 
-
-
-
-
 };
 
 
-class User:Lost-Found{
+class User:public Lost-Found{
 	private:
 
 	public:
@@ -29,7 +25,7 @@ class User:Lost-Found{
 
 
 
-class Admin:Lost-Found{
+class Admin:protected Lost-Found{
 
 	private:
 
