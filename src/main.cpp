@@ -4,6 +4,28 @@
 using namespace std;
 
 
+struct lItem{
+    int itemid;
+    string name;
+    string des;
+    string loc;
+    int day;
+    int month;
+    int year;
+
+};
+
+struct fItem{
+    int itemid;
+    string name;
+    string des;
+    string loc;
+    int day;
+    int month;
+    int year;
+};
+
+
 class Lost-Found{
 
 	private:
