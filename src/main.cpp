@@ -36,10 +36,11 @@ using std::chrono::seconds;
 
 
 struct lItem{
-    int itemid;
+    string itemid;
     string name;
     string des;
     string loc;
+    string lostBy;
     int day;
     int month;
     int year;
@@ -47,10 +48,11 @@ struct lItem{
 };
 
 struct fItem{
-    int itemid;
+    string itemid;
     string name;
     string des;
     string loc;
+    string foundBy;
     int day;
     int month;
     int year;
@@ -95,7 +97,6 @@ class LostFound{
 
             if(joson["username"]==username && joson["password"]==password){
                 //cout<<joson["username"]<<"\n"<<joson["_id"]<<"\n";
-                sleep_for(seconds(10));
                 return true;
             }
             else{
@@ -196,7 +197,16 @@ class User:public LostFound{
         }
 
 
-        void reportlost();
+        void reportlost(){
+             
+            cout<<"follow the procedure to report your lost item\n";
+            
+            lItem item;
+
+            
+
+
+        }
 
         void reportfound();
         void viewAllLost();
