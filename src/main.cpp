@@ -76,7 +76,7 @@ struct cItem{
 };
 
 mongocxx::instance instance;
-mongocxx::uri uri("mongodb+srv://bhargavj16:S8JUoO8L6a7B4kEG@clster0.dj1sh.mongodb.net/?retryWrites=true&w=majority&appName=clster0");
+mongocxx::uri uri("<url>");
 mongocxx::client client(uri);
 auto db = client["lost-found"];
 
