@@ -29,9 +29,12 @@ int main() {
 
     auto result = collection.find_one(make_document(kvp("username", "admin")),opts);
 
-    std::cout<<result->view()["_id"].get_oid().value.to_string();
+    //std::cout<<result->view()["_id"].get_oid().value.to_string();
+    std::cout<<result->view()["_id"].key();
 
     std::cout << bsoncxx::to_json(*result) << std::endl;
+    string x="76";
+    std::cout<<std::stoi(x);
     //*/
     
     /*
