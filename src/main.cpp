@@ -19,7 +19,6 @@ using bsoncxx::builder::basic::make_array;
 using bsoncxx::stdx::string_view;
 using bsoncxx::oid;
 
-
 //using namespace std;
 using std::cin;
 using std::cout;
@@ -83,11 +82,8 @@ auto db = client["lost-found"];
 class LostFound{
 
 	private:
-
         time_t timestamp = time(NULL);
         struct tm datetime = *localtime(&timestamp);
-        int currmonth=datetime.tm_mon +1;
-        int curryear=datetime.tm_year +1900;
 
 	protected:
 
@@ -97,13 +93,14 @@ class LostFound{
             auto archivec=db["archived"];
             auto claimsc=db["claims"];  
 
+            int monthd=currmonth-6;
+            if(monthd<=0) monthd+=12;
+
             auto find=foundc.find(make_document(kvp("$or" ,make_array(
-                make_document(kvp("month",make_document(kvp("$lt",currmonth-3)))),
+                make_document(kvp("month",make_document(kvp("$lt",monthd)))),
                 make_document(kvp("year",make_document(kvp("$lt",curryear-1))))
                 ) )));
 
-
-            
             
             vector<bsoncxx::document::view> findvec;
             for(auto&& r:find){
@@ -132,11 +129,114 @@ class LostFound{
     
         } //done
 
-        void addNUser(){int a=2;}//all remains
+        void createUser(string username,string password,bool is_admin){
 
-        void resolveClaim(){int a=2;} //all remains
+            auto coll=db["users"];
+
+            if(is_admin) coll=db["admins"];
+
+            auto res=coll.insert_one(make_document(
+                        kvp("username",username),
+                        kvp("password",password)
+            ));
+
+            return;
+
+        }//all remains
+
+        void resolveClaim(string fid,string lid){
+        
+            auto fcoll=db["found-items"];
+            auto lcoll=db["lost-items"];
+            auto ccoll=db["claims"];
+
+            auto foid=oid(string_view(fid));
+            auto loid=oid(string_view(lid));
+
+            auto fdelete=fcoll.delete_one(make_document(kvp("_id",foid)));
+            auto ldelete=lcoll.delete_one(make_document(kvp("_id",loid)));
+
+
+            auto query_filter = make_document(kvp("found id", fid));
+            auto update_doc = make_document(kvp("$set", make_document(kvp("status", "rejected"))));
+
+            auto result = ccoll.update_many(query_filter.view(), update_doc.view());
+
+            auto qf = make_document(kvp("$and",
+                        make_array(make_document(kvp("found id",fid)),
+                                    make_document(kvp("lost id", lid)))));
+
+            auto ud = make_document(kvp("$set", make_document(kvp("status", "accepted"))));
+
+            auto res = ccoll.update_one(qf.view(), ud.view());
+
+            return;
+
+        } //testing remains
+
+
+        fItem getoneFound(string id){
+
+            auto findcoll=db["found-items"];
+
+            auto oide=oid(string_view(id));
+            auto query_filter = make_document(kvp("_id", oide));
+
+            auto res=findcoll.find_one(query_filter.view());
+
+            auto doc=res->view();
+            fItem item;
+            item.itemid=doc["_id"].get_oid().value.to_string();;
+            item.name=doc["name"].get_string().value;
+            item.des=doc["description"].get_string().value;
+            item.loc=doc["location"].get_string().value;
+            item.foundBy=doc["foundBy"].get_string().value;
+            item.day=doc["day"].get_int32().value;
+            item.month=doc["month"].get_int32().value;
+            item.year=doc["year"].get_int32().value;
+            
+            vector<pair<string,string>> cby;
+            for(auto p:doc["claimed by"].get_array().value){
+                
+                auto s=p["user"].get_string().value;
+                //auto s="abc";
+                auto k=p["lost-id"].get_string().value;
+                cby.push_back(std::make_pair((string)s,(string)k));
+            }
+            item.claimed_by=cby;
+            item.claimCount=cby.size();
+
+
+            return item;
+        } //done
+
+        lItem getonelost(string id){
+            auto lostcoll=db["lost-items"];
+
+            auto oide=oid(string_view(id));
+            auto query_filter = make_document(kvp("_id", oide));
+
+            auto res=lostcoll.find_one(query_filter.view());
+            auto doc=res->view();
+            lItem item;
+            item.itemid=doc["_id"].get_oid().value.to_string();;
+            item.name=doc["name"].get_string().value;
+            item.des=doc["description"].get_string().value;
+            item.loc=doc["location"].get_string().value;
+            item.lostBy=doc["lostBy"].get_string().value;
+            item.day=doc["day"].get_int32().value;
+            item.month=doc["month"].get_int32().value;
+            item.year=doc["year"].get_int32().value;
+
+            return item;
+        } //done
+
 
 	public: 
+
+        
+        int currmonth=datetime.tm_mon +1;
+        int curryear=datetime.tm_year +1900;
 
         bool authenticate(string username,string password, bool is_admin){
 
@@ -227,7 +327,6 @@ class LostFound{
                     auto s=p["user"].get_string().value;
                     //auto s="abc";
                     auto k=p["lost-id"].get_string().value;
-                    cout<<s<<" "<<k;
                     cby.push_back(std::make_pair((string)s,(string)k));
 
                 }
@@ -454,6 +553,7 @@ class User:public LostFound{
 
 
         void reportlost(){
+
             system(CLEAR);
             cout<<"follow the procedure to report your lost item\n";
             
@@ -476,6 +576,14 @@ class User:public LostFound{
             cout<<"year:";
             getline(cin,temp);
             item.year=stoi(temp);
+
+            if(item.day>31 || item.day<1 || item.month<=0 ||item.month>12|| item.year<2000 || item.year>this->curryear){
+                cout<<"you have entered wrong date please redo with correct dates\n";
+                sleep_for(seconds(3));
+                reportlost();
+                return ;
+            }
+
             cout<<"where you lost your item?";
             cout<<"location:";
             getline(cin,item.loc); 
@@ -536,6 +644,13 @@ class User:public LostFound{
             cout<<"year:";
             getline(cin,temp);
             item.year=stoi(temp);
+
+            if(item.day>31 || item.day<1 || item.month<=0 ||item.month>12|| item.year<2000 || item.year>this->curryear){
+                cout<<"you have entered wrong date please redo with correct dates\n";
+                reportfound();
+                return ;
+            }
+
             cout<<"where you found this your item?";
             cout<<"location:";
             getline(cin,item.loc); 
@@ -603,8 +718,13 @@ class User:public LostFound{
                 cout<<"index: ";
                 string id;
                 getline(cin,id);
-                idx=stoi(id);
-                idx--;
+                int indx=stoi(id);
+                indx--;
+                if(indx>=idx || indx<0){
+                    cout<<"entered wrong index retry with correct one\n";
+                    sleep_for(seconds(2));
+                    goto rechoice;
+                }
                 cout<<"enter date you found this item\n";
                 string fday;string fmonth;string fyear;
                 cout<<"day: ";
@@ -615,21 +735,21 @@ class User:public LostFound{
                 getline(cin,fyear);
 
                 fItem f;
-                f.name=items[idx].name;
-                f.des=items[idx].des;
-                f.loc=items[idx].loc;
+                f.name=items[indx].name;
+                f.des=items[indx].des;
+                f.loc=items[indx].loc;
                 f.foundBy=currUser;
                 f.day=stoi(fday);
                 f.month=stoi(fmonth);
                 f.year=stoi(fyear);
-                f.claimed_by.push_back(make_pair(items[idx].lostBy,items[idx].itemid));
+                f.claimed_by.push_back(make_pair(items[indx].lostBy,items[indx].itemid));
                 string fid=addFound(f);
 
                 cItem ix;
                 ix.fid=fid;
-                ix.lid=items[idx].itemid;
+                ix.lid=items[indx].itemid;
                 ix.claimed_by=currUser;
-                ix.claimed_for=items[idx].lostBy;
+                ix.claimed_for=items[indx].lostBy;
                 addtoClaim(ix);
                 
                 cout<<"added successfully \n";
@@ -684,11 +804,16 @@ class User:public LostFound{
                 
                 cout<<"select index of found item you want to make claim to\n";
                 cout<<"enter index: ";
-                string indx;
-                getline(cin,indx);
-                idx=stoi(indx);
-                
-                makeClaim(items[--idx]);
+                string abid;
+                getline(cin,abid);
+                int indx=stoi(abid);
+                indx--;
+                if(indx>=idx || indx<0){
+                    cout<<"entered wrong index retry with correct one\n";
+                    sleep_for(seconds(2));
+                    goto re;
+                }
+                makeClaim(items[indx]);
 
             }
             else if(choice=="2"){
@@ -761,7 +886,7 @@ class User:public LostFound{
             start();
             
             return ;
-        }
+        } //done
 
         void makeClaim(fItem item){
             rec:
@@ -788,15 +913,21 @@ class User:public LostFound{
                 cout<<"enter index:";
                 string y;
                 getline(cin,y);
-                idx=stoi(y);
-                idx--;
+                int indx=stoi(y);
+                indx--;
 
-                item.claimed_by.push_back(make_pair(currUser,finalL[idx].itemid));
+                if(indx>=idx || indx<0){
+                    cout<<"entered wrong index retry with correct one\n";
+                    sleep_for(seconds(2));
+                    goto rec;
+                }
+
+                item.claimed_by.push_back(make_pair(currUser,finalL[indx].itemid));
                 updateFound(item);
                 
                 cItem ix;
                 ix.fid=item.itemid;
-                ix.lid=finalL[idx].itemid;
+                ix.lid=finalL[indx].itemid;
                 ix.claimed_by=currUser;
                 ix.claimed_for=currUser;
                 addtoClaim(ix);
@@ -812,6 +943,7 @@ class User:public LostFound{
                 l.loc=item.loc;
                 l.day=item.day;
                 l.month=item.month;
+                l.lostBy=currUser;
                 l.year=item.year;
 
                 string id=addLost(l);
@@ -939,7 +1071,7 @@ class Admin:protected LostFound{
                 cout<<"description: "<<a.des<<"\n";
                 cout<<"location: "<<a.loc<<"\n";
                 cout<<"lost by: "<<a.lostBy<<"\n";
-                cout<<"date lost: "<<a.day<<"/"<<a.month<<"/"<<a.year<<"\n";
+                cout<<"date lost: "<<a.day<<"/"<<a.month<<"/"<<a.year<<"\n"<<std::endl;
             }
             cout<<"hit any key to go back to main menu\n";
             string any;
@@ -960,7 +1092,7 @@ class Admin:protected LostFound{
                 cout<<"found by: "<<a.foundBy<<"\n";
                 cout<<"date lost: "<<a.day<<"/"<<a.month<<"/"<<a.year<<"\n";
                 for(auto c:a.claimed_by){
-                    cout<<"claimed_by: "<<c.first<<"\n"<<"claimed under :"<<c.second;
+                    cout<<"claimed_by: "<<c.first<<"\n"<<"claimed under :"<<c.second<<std::endl;
                 }
                 cout<<"\n";
             }
@@ -976,18 +1108,31 @@ class Admin:protected LostFound{
 
         void viewClaims(){
             system(CLEAR);
-            cout<<"showing all claims\n";
+            cout<<"showing all pending claims\n";
             sleep_for(seconds(1));
             vector<cItem> items=getAllClaims();
+            vector<cItem> pendingItems;
             int idx=1;
             for(auto a:items){
-                cout<<"index:"<<idx<<"\n";
-                cout<<"found id: "<<a.fid<<"\n";
-                cout<<"lost id: "<<a.lid<<"\n";
-                cout<<"claimed by: "<<a.claimed_by<<"\n";
-                cout<<"claimed for: "<<a.claimed_for<<"\n";
-                cout<<"status: "<<a.status<<" \n"<<std::endl;
-                idx++;
+                if(a.status=="pending"){
+                    cout<<"index:"<<idx<<"\n";
+                    cout<<"found id: "<<a.fid<<"\n";
+                    cout<<"lost id: "<<a.lid<<"\n";
+                    cout<<"claimed by: "<<a.claimed_by<<"\n";
+                    cout<<"claimed for: "<<a.claimed_for<<"\n";
+                    cout<<"status: "<<a.status<<" \n"<<std::endl;
+                    idx++;
+                    pendingItems.push_back(a);
+                }
+            }
+            
+            if(pendingItems.size()==0){
+
+                cout<<"hurray no pending requests\n";
+                sleep_for(seconds(3));
+                cout<<"returning to main menu...\n";
+                start();
+                return;
             }
 
             reopn:
@@ -999,9 +1144,13 @@ class Admin:protected LostFound{
                 cout<<"enter index which you want to verify\n";
                 cout<<"index: ";
                 getline(cin,any);
-                idx=stoi(any)-1;
-
-                verifyClaim(items[idx]);
+                int indx=stoi(any)-1;
+                if(indx>=idx || indx<0){
+                    cout<<"entered wrong index retry with correct one\n";
+                    sleep_for(seconds(2));
+                    goto reopn;
+                }
+                verifyClaim(pendingItems[indx]);
             }
             else if(any=="2"){
                 cout<<"returning to main menu please wait..\n";
@@ -1017,7 +1166,68 @@ class Admin:protected LostFound{
         } //done
 
 
-        void verifyClaim(cItem item){int a=2;} //fully remaining
+        void verifyClaim(cItem item){
+        
+            cout<<"retrieving data regarding claim\n"<<std::endl;
+            sleep_for(seconds(1));
+
+            fItem fi=getoneFound(item.fid);
+
+            vector<lItem> lis;
+
+            for(auto v:fi.claimed_by){
+
+                lItem li=getonelost(v.second);
+
+                lis.push_back(li);
+
+            }
+            cout<<"details of found items:\n";
+
+            cout<<"name: "<<fi.name<<"\n";
+            cout<<"description: "<<fi.des<<"\n";
+            cout<<"location: "<<fi.loc<<"\n";
+            cout<<"found by: "<<fi.foundBy<<"\n";
+            cout<<"date lost: "<<fi.day<<"/"<<fi.month<<"/"<<fi.year<<"\n"<<std::endl;
+            cout<<" \n";
+
+            cout<<"\ndetails of lost items in claim of the found item:\n";
+            int idx=1;
+            for(auto a:lis){
+                cout<<"index: "<<idx<<"\n";
+                cout<<"name: "<<a.name<<"\n";
+                cout<<"description: "<<a.des<<"\n";
+                cout<<"location: "<<a.loc<<"\n";
+                cout<<"lost by: "<<a.lostBy<<"\n";
+                cout<<"date lost: "<<a.day<<"/"<<a.month<<"/"<<a.year<<"\n"<<std::endl;
+                idx++;
+            }
+
+            reon:
+
+            cout<<"select index of lost item you want to give claim to\n";
+            cout<<"enter index: ";
+            string any;
+            getline(cin,any);
+            int indx=stoi(any)-1;
+            if(indx>=idx || indx<0){
+                cout<<"entered wrong index retry with correct one\n";
+                sleep_for(seconds(2));
+                goto reon;
+            }
+
+            resolveClaim(fi.itemid,lis[indx].itemid);
+
+            cout<<"successfully given item to "<<lis[indx].lostBy<<std::endl;
+
+            cout<<"returning back to main menu....\n";
+
+            sleep_for(seconds(2));
+
+            start();
+
+            return;
+        } //done
 
         void archiveItems(){
             system(CLEAR);
@@ -1048,7 +1258,31 @@ class Admin:protected LostFound{
         }   //done
 
 
-        void addUser(){int a=2;} //all remaining
+        void addUser(){
+            cout<<"enter details of  new user\n";
+
+            cout<<"enter username: ";
+            string username;
+            getline(cin,username);
+            cout<<"enter password: ";
+            string password;
+            getline(cin,password);
+            
+            cout<<"is admin(y/n): ";
+            string isad;
+            getline(cin,isad);
+            bool is_admin=false;
+            if(isad=="y") is_admin=true;
+
+            createUser(username,password,is_admin);
+
+            cout<<"successfully added new user\n";
+            sleep_for(seconds(3));
+
+            start();
+            return;
+
+        } //done
         
 
 };
