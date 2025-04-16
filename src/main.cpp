@@ -142,7 +142,24 @@ class LostFound{
 
             return;
 
-        }//all remains
+        }//done
+
+        bool Usercheck(string username,bool is_admin){
+            
+            auto coll=db["users"];
+
+            if(is_admin) coll=db["admins"];
+
+            auto query=make_document(kvp("username",username));
+
+            auto result=coll.count_documents(query.view());
+
+            if(result==0) return false;
+            
+            return true;
+
+
+        }
 
         void resolveClaim(string fid,string lid){
         
@@ -1273,6 +1290,13 @@ class Admin:protected LostFound{
             getline(cin,isad);
             bool is_admin=false;
             if(isad=="y") is_admin=true;
+
+            bool check=Usercheck(username,is_admin);
+
+            if(check){
+                cout<<"username is already taken please type something unique\n";
+                addUser();
+            }
 
             createUser(username,password,is_admin);
 
