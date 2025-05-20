@@ -111,7 +111,7 @@ class LostFound{
                 auto update_doc = make_document(kvp("$set", make_document(kvp("status", "item archived"))));
 
                 auto result = claimsc.update_many(x.view(), update_doc.view());
-            }
+           }
 
             if(findvec.size()!=0){
                 auto done=archivec.insert_many(findvec);
@@ -1320,7 +1320,7 @@ int main(){
     */
 
     //mongocxx::instance instance;
-    //mongocxx::uri uri("mongodb+srv://bhargavj16:S8JUoO8L6a7B4kEG@clster0.dj1sh.mongodb.net/?retryWrites=true&w=majority&appName=clster0");
+    //mongocxx::uri uri("url-here");
     //mongocxx::client clnt(uri);
     //auto db = clnt["lost-found"];
     //auto collection = db["admins"];
