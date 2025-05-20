@@ -75,7 +75,7 @@ struct cItem{
 };
 
 mongocxx::instance instance;
-mongocxx::uri uri("<url>");
+mongocxx::uri uri("<url here>");
 mongocxx::client client(uri);
 auto db = client["lost-found"];
 
@@ -478,7 +478,7 @@ class LostFound{
 };
 
 
-class User:public LostFound{
+class User:private LostFound{
 	private:
         bool is_auth=false;
 
@@ -994,7 +994,7 @@ class User:public LostFound{
 
 };
 
-class Admin:protected LostFound{
+class Admin:private LostFound{
 
 	private:
         bool is_auth=false;
@@ -1351,7 +1351,7 @@ void creatSession(){
         usr.start();
     }
     else if(d=="2"){
-        cout<<"creating a user session please wait\n";
+        cout<<"creating a admin session please wait\n";
         sleep_for(seconds(2));
         //system(CLEAR);
         Admin usr;
